@@ -40,7 +40,7 @@ function set-userchoice {
         foreach ($SubKey in $parent.GetSubKeyNames()){
             if ($SubKey -eq 'UserChoice'){
                 $parent.DeleteSubKey('UserChoice', $true)
-                $parent.CreateSubKey("UserChoice")
+                $parent.CreateSubKey("UserChoice")|out-null
                 $parent_user=$parent.OpenSubKey('UserChoice', $true)
                 $parent_user.SetValue("Progid", $name, $RegistryValueKind)
                 $parent_user.Close()

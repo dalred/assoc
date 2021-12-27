@@ -141,10 +141,7 @@ else
 		Write-warning ("{0} - {1}" -f $ErrorMessage, $FailedItem)
 		WriteLog -LogString $ErrorMessage
 	}
-	finally
-	{
-		WriteLog -LogString "Finish work!!!"
-	}
+	
 }
 
 

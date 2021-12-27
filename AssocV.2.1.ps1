@@ -1,4 +1,13 @@
-﻿[System.Text.Encoding]::GetEncoding("cp866") | Out-Null
+﻿<#Механизм работы такой, cmd /c assoc создает ассоциацию расширения файла к типу в root,
+далее ftype связывает его с программой для выполнения, то есть по сути названия типов могут быть любимыми.
+Но есть случай в котором эти ассоциации не помогут, случай когда пользователь выбрал программу по умолчанию сам(открыть с помощью),
+в этом случае начинает действовать ветка Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts в Сurrent user,
+поэтому там тоже необходимо внести изменения, поскольку cmdlet не всегда хорошо отрабатывают в Powershell 2.0, когда работает с реестром, 
+мы воспользовались сборкой Microsoft.Win32.Registry, небольшие нарекания есть, но в целом отрабатывает хорошо.
+#>
+
+
+[System.Text.Encoding]::GetEncoding("cp866") | Out-Null
 
 $HKCRTextX = "HKCR:\TextEditor.docx"
 $HKCRTextrtf = "HKCR:\TextEditor.rtf"
@@ -14,6 +23,7 @@ $HKUpath="Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
 
 
 $Logfile = "$env:TEMP\assocscript_$env:computername.log"
+#Логирование по желанию.
 function WriteLog
 {
 	Param ([string]$LogString)
@@ -21,7 +31,7 @@ function WriteLog
 	$LogMessage = "{0}: {1}" -f $Stamp, $LogString
 	Add-content $LogFile -value $LogMessage
 }
-
+#Работаем в HKEY_USERS в current
 function set-userchoice {
     $type_list=("SpreadsheetEditor.xls",
     "SpreadsheetEditor.xlsx",
@@ -39,15 +49,19 @@ function set-userchoice {
     $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
         foreach ($SubKey in $parent.GetSubKeyNames()){
             if ($SubKey -eq 'UserChoice'){
+                WriteLog -LogString "DeleteSubKey UserChoice in $name"
                 $parent.DeleteSubKey('UserChoice', $true)
                 $parent.CreateSubKey("UserChoice")|out-null
                 $parent_user=$parent.OpenSubKey('UserChoice', $true)
+                WriteLog -LogString "SetValue UserChoice $name"
                 $parent_user.SetValue("Progid", $name, $RegistryValueKind)
                 $parent_user.Close()
             }
         }
     }
 }
+
+
 
 function set-items
 {
@@ -91,6 +105,7 @@ function set-items
 	cmd /c ftype `"PresentationViewer.pptx`"=`""$path_Present`"" `""%1`"" | Out-Null
 	cmd /c ftype `"PresentationViewer.ppt`"=`""$path_Present`"" `""%1`"" | Out-Null
 	
+    #Данный раздел добавлен на тот случай если каким-то образом у пользователя сбились пути на ico
 	WriteLog -LogString "New-Item DOCX.ico"
 	New-Item -Path $HKCRTextX\DefaultIcon -Value `""$program\MyOffice\DOCX.ico`"" -Force -ErrorAction Stop | Out-Null
 	New-Item -Path $HKCRTextX\Application -Force -ErrorAction Stop | Out-Null
@@ -132,6 +147,7 @@ function set-items
 	New-Item -Path $HKCRppt\DefaultIcon -Value `""$program\MyOffice\PPT.ico`"" -Force -ErrorAction Stop | Out-Null
     
     WriteLog -LogString "set userchoice"
+    #Работаем в HKEY_USERS
     set-userchoice
 }
 

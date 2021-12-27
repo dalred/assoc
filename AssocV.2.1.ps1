@@ -76,7 +76,7 @@ function set-items
 	{
 		if (-Not (Test-Path -Path $i))
 		{
-			throw ("Не существует пути: {0}" -f $i)
+			throw ("Ошибка! Не существует пути: {0}" -f $i)
 		}
 	}
 	
@@ -190,8 +190,8 @@ else
 	{
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-warning ("Ошибка {0} - {1}" -f $ErrorMessage, $FailedItem)
-		WriteLog -LogString $ErrorMessage
+		Write-warning ("Ошибка: {0} - {1}" -f $ErrorMessage, $FailedItem)
+		WriteLog -LogString ("Ошибка: {0} - {1}" -f $ErrorMessage, $FailedItem)
 	}
 	finally
 	{

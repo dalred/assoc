@@ -143,7 +143,7 @@ else
 	}
 	finally
 	{
-		WriteLog -LogString "Finish work!"
+		WriteLog -LogString "Finish work!!!"
 	}
 }
 

@@ -190,7 +190,7 @@ else
 	{
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-warning ("Ошибка: {0} - {1}" -f $ErrorMessage, $FailedItem)
+		Write-warning ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
 		WriteLog -LogString ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
 	}
 	finally

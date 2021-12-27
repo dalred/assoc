@@ -10,6 +10,8 @@ $HKCRSpreadcsv = "HKCR:\SpreadsheetEditor.csv"
 $HKCRpptx = "HKCR:\PresentationViewer.pptx"
 $HKCRppt = "HKCR:\PresentationViewer.ppt"
 
+$HKUpath="Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
+
 
 $Logfile = "$env:TEMP\assocscript_$env:computername.log"
 function WriteLog
@@ -20,6 +22,32 @@ function WriteLog
 	Add-content $LogFile -value $LogMessage
 }
 
+function set-userchoice {
+    $type_list=("SpreadsheetEditor.xls",
+    "SpreadsheetEditor.xlsx",
+    "SpreadsheetEditor.csv",
+    "TextEditor.docx",
+    "TextEditor.doc",
+    "TextEditor.rtf",
+    "PresentationViewer.pptx",
+    "PresentationViewer.ppt")
+
+    foreach ($name in $type_list)
+    {
+    $Ext=$name.Split(".")[1]
+    $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
+    $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
+        foreach ($SubKey in $parent.GetSubKeyNames()){
+            if ($SubKey -eq 'UserChoice'){
+                $parent.DeleteSubKey('UserChoice', $true)
+                $parent.CreateSubKey("UserChoice")
+                $parent_user=$parent.OpenSubKey('UserChoice', $true)
+                $parent_user.SetValue("Progid", $name, $RegistryValueKind)
+                $parent_user.Close()
+            }
+        }
+    }
+}
 
 function set-items
 {
@@ -102,11 +130,19 @@ function set-items
 	New-Item -Path $HKCRppt\Application -Force -ErrorAction Stop | Out-Null
 	New-ItemProperty -Path $HKCRpptx\Application -Name ApplicationName -Value "МойОфис Презентация" -Force -ErrorAction Stop | Out-Null
 	New-Item -Path $HKCRppt\DefaultIcon -Value `""$program\MyOffice\PPT.ico`"" -Force -ErrorAction Stop | Out-Null
+    
+    WriteLog -LogString "set userchoice"
+    set-userchoice
 }
 
 if (-Not (Test-Path -Path HKCR:\))
 {
 	New-PSDrive -PSProvider registry -Root HKEY_CLASSES_ROOT -Name HKCR | Out-Null
+}
+
+if (-Not (Test-Path -Path HKU:\))
+{
+	New-PSDrive -PSProvider registry -Root HKEY_USERS -Name HKU | Out-Null
 }
 
 
@@ -120,7 +156,7 @@ if ([IntPtr]::Size -eq 8)
 	{
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-warning ("{0} - {1}" -f $ErrorMessage, $FailedItem)
+		Write-warning ("Ошибка {0} - {1}" -f $ErrorMessage, $FailedItem)
 		WriteLog -LogString $ErrorMessage
 	}
 	finally
@@ -138,10 +174,13 @@ else
 	{
 		$ErrorMessage = $_.Exception.Message
 		$FailedItem = $_.Exception.ItemName
-		Write-warning ("{0} - {1}" -f $ErrorMessage, $FailedItem)
+		Write-warning ("Ошибка {0} - {1}" -f $ErrorMessage, $FailedItem)
 		WriteLog -LogString $ErrorMessage
 	}
-	
+	finally
+	{
+		WriteLog -LogString "Finish work!"
+	}
 }
 
 

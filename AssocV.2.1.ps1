@@ -8,21 +8,9 @@
 
 
 [System.Text.Encoding]::GetEncoding("cp866") | Out-Null
-
-$HKCRTextX = "HKCR:\TextEditor.docx"
-$HKCRTextrtf = "HKCR:\TextEditor.rtf"
-$HKCRText = "HKCR:\TextEditor.doc"
-
-$HKCRSpreadX = "HKCR:\SpreadsheetEditor.xlsx"
-$HKCRSpread = "HKCR:\SpreadsheetEditor.xls"
-$HKCRSpreadcsv = "HKCR:\SpreadsheetEditor.csv"
-$HKCRpptx = "HKCR:\PresentationViewer.pptx"
-$HKCRppt = "HKCR:\PresentationViewer.ppt"
-
-$HKUpath="Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
-
-
+$HKUpath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
 $Logfile = "$env:TEMP\assocscript_$env:computername.log"
+
 #Логирование по желанию.
 function WriteLog
 {
@@ -31,38 +19,72 @@ function WriteLog
 	$LogMessage = "{0}: {1}" -f $Stamp, $LogString
 	Add-content $LogFile -value $LogMessage
 }
-#Работаем в HKEY_USERS в current
-function set-userchoice {
-    $type_list=("SpreadsheetEditor.xls",
-    "SpreadsheetEditor.xlsx",
-    "SpreadsheetEditor.csv",
-    "TextEditor.docx",
-    "TextEditor.doc",
-    "TextEditor.rtf",
-    "PresentationViewer.pptx",
-    "PresentationViewer.ppt")
-
-    foreach ($name in $type_list) {
-    $Ext=$name.Split(".")[1]
-    $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
-    $Progid=[Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice","Progid", $null)
-    $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
-        if ($Progid){
-            WriteLog -LogString "Old Progid=$Progid"
-            $parent.DeleteSubKey('UserChoice', $true)
-            $parent.CreateSubKey("UserChoice")|out-null
-            $parent_user=$parent.OpenSubKey('UserChoice', $true)
-            WriteLog -LogString "SetValue UserChoice $name"
-            $parent_user.SetValue("Progid", $name, $RegistryValueKind)
-            $parent_user.Close()
-            $parent.Close()
-        }
-    }
+#Работаем в HKEY_USERS, HKUpath
+function set-items_reg
+{
+	param ($program)
+	$hash_object = @{
+		"МойОфис Текст"	      = ("TextEditor.docx", "TextEditor.doc", "TextEditor.rtf");
+		"МойОфис Таблица"	  = ("SpreadsheetEditor.xls", "SpreadsheetEditor.xlsx", "SpreadsheetEditor.csv");
+		"МойОфис Презентация" = ("PresentationViewer.pptx", "PresentationViewer.ppt")
+	}
+	$MyPSObject = New-Object -TypeName psobject -Property $hash_object
+	$RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
+	
+	$MyPSObject.PSObject.Properties | ForEach-Object {
+		$name = $_.Name
+		$_.Value | ForEach-Object {
+			$ftype = $_
+			$Ext = $_.Split(".")[1]
+			$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
+			$appKey = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\Application")
+			If (-not $appKey)
+			{
+				WriteLog -LogString "CreateSubKey Application"
+				$parent.CreateSubKey("Application") | out-null
+				$parent_user = $parent.OpenSubKey('Application', $true)
+				WriteLog -LogString "SetValue ApplicationName $name"
+				$parent_user.SetValue("ApplicationName", $name, $RegistryValueKind)
+				$parent_user.Close()
+			}
+			$Icon = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\DefaultIcon")
+			If (-not $Icon)
+			{
+				$RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
+				WriteLog -LogString "CreateSubKey DefaultIcon"
+				$parent.CreateSubKey("DefaultIcon") | out-null
+				$parent_user = $parent.OpenSubKey('DefaultIcon', $true)
+				$ExtUP = $Ext.ToUpper()
+				WriteLog -LogString "SetValue to DefaultIcon $program\MyOffice\$ExtUP.ico"
+				$parent_user.SetValue($null, """$program\MyOffice\$ExtUP.ico""", $RegistryValueKind)
+				$parent_user.Close()
+				
+			}
+			$parent.Close()
+			write-host "$HKUpath\.$Ext"
+			$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
+			$Progid = [Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice", "Progid", $null)
+			$RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
+			if ($Progid)
+			{
+				WriteLog -LogString "Progid was $Progid"
+				WriteLog -LogString "DeleteSubKey UserChoice"
+				$parent.DeleteSubKey('UserChoice', $true)
+				WriteLog -LogString "CreateSubKey UserChoice"
+				$parent.CreateSubKey("UserChoice") | out-null
+				$parent_user = $parent.OpenSubKey('UserChoice', $true)
+				WriteLog -LogString "SetValue Progid $ftype"
+				$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
+				$parent_user.Close()
+			}
+			$parent.Close()
+		}
+	}
+	
 }
 
 
-
-function set-items
+function set-assoc
 {
 	param ($program)
 	$path_Spread = "$program\MyOffice\MyOffice Spreadsheet.exe"
@@ -104,50 +126,9 @@ function set-items
 	cmd /c ftype `"PresentationViewer.pptx`"=`""$path_Present`"" `""%1`"" | Out-Null
 	cmd /c ftype `"PresentationViewer.ppt`"=`""$path_Present`"" `""%1`"" | Out-Null
 	
-    #Данный раздел добавлен на тот случай если каким-то образом у пользователя сбились пути на ico
-	WriteLog -LogString "New-Item DOCX.ico"
-	New-Item -Path $HKCRTextX\DefaultIcon -Value `""$program\MyOffice\DOCX.ico`"" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRTextX\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRTextX\Application -Name ApplicationName -Value "МойОфис Текст" -Force -ErrorAction Stop | Out-Null
+	WriteLog -LogString "set items_reg"
+	set-items_reg -program $program
 	
-	WriteLog -LogString "New-Item DOC.ico"
-	New-Item -Path $HKCRText\DefaultIcon -Value `""$program\MyOffice\DOC.ico`"" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRText\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRText\Application -Name ApplicationName -Value "МойОфис Текст" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item RTF.ico"
-	New-Item -Path $HKCRTextrtf\DefaultIcon -Value `""$program\MyOffice\RTF.ico`"" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRTextrtf\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRTextrtf\Application -Name ApplicationName -Value "МойОфис Текст" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item XLSX.ico"
-	New-Item -Path $HKCRSpreadX\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRSpreadX\Application -Name ApplicationName -Value "МойОфис Таблица" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRSpreadX\DefaultIcon -Value `""$program\MyOffice\XLSX.ico`"" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item XLS.ico"
-	New-Item -Path $HKCRSpread\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRSpread\Application -Name ApplicationName -Value "МойОфис Таблица" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRSpread\DefaultIcon -Value `""$program\MyOffice\XLS.ico`"" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item CSV.ico"
-	New-Item -Path $HKCRSpreadcsv\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRSpreadcsv\Application -Name ApplicationName -Value "МойОфис Таблица" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRSpreadcsv\DefaultIcon -Value `""$program\MyOffice\CSV.ico`"" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item PPTX.ico"
-	New-Item -Path $HKCRpptx\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRpptx\Application -Name ApplicationName -Value "МойОфис Презентация" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRpptx\DefaultIcon -Value `""$program\MyOffice\PPTX.ico`"" -Force -ErrorAction Stop | Out-Null
-	
-	WriteLog -LogString "New-Item PPT.ico"
-	New-Item -Path $HKCRppt\Application -Force -ErrorAction Stop | Out-Null
-	New-ItemProperty -Path $HKCRpptx\Application -Name ApplicationName -Value "МойОфис Презентация" -Force -ErrorAction Stop | Out-Null
-	New-Item -Path $HKCRppt\DefaultIcon -Value `""$program\MyOffice\PPT.ico`"" -Force -ErrorAction Stop | Out-Null
-    
-    WriteLog -LogString "set userchoice"
-    #Работаем в HKEY_USERS
-    set-userchoice
 }
 
 if (-Not (Test-Path -Path HKCR:\))
@@ -165,7 +146,7 @@ if ([IntPtr]::Size -eq 8)
 {
 	try
 	{
-		set-items -program $env:ProgramFiles
+		set-assoc -program $env:ProgramFiles
 	}
 	catch
 	{
@@ -183,7 +164,7 @@ else
 {
 	try
 	{
-		set-items -program ${env:ProgramFiles(x86)}
+		set-assoc -program ${env:ProgramFiles(x86)}
 	}
 	catch
 	{

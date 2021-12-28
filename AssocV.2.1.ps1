@@ -61,16 +61,15 @@ function set-items_reg
 				
 			}
 			$parent.Close()
-			write-host "$HKUpath\.$Ext"
 			$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
 			$Progid = [Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice", "Progid", $null)
 			$RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
 			if ($Progid)
 			{
 				WriteLog -LogString "Progid was $Progid"
-				WriteLog -LogString "DeleteSubKey UserChoice"
+				WriteLog -LogString "DeleteSubKey UserChoice in $ftype"
 				$parent.DeleteSubKey('UserChoice', $true)
-				WriteLog -LogString "CreateSubKey UserChoice"
+				WriteLog -LogString "CreateSubKey UserChoice  in $ftype"
 				$parent.CreateSubKey("UserChoice") | out-null
 				$parent_user = $parent.OpenSubKey('UserChoice', $true)
 				WriteLog -LogString "SetValue Progid $ftype"
@@ -102,7 +101,8 @@ function set-assoc
 	}
 	
 	WriteLog -LogString "Start assoc"
-	cmd /c assoc .xls=SpreadsheetEditor.xls | Out-Null
+    try {
+	cmds /c assoc .xls=SpreadsheetEditor.xls | Out-Null
 	cmd /c assoc .xlsx=SpreadsheetEditor.xlsx | Out-Null
 	cmd /c assoc  .xlsm=SpreadsheetEditor.xlsx | Out-Null
 	cmd /c assoc  .csv=SpreadsheetEditor.csv | Out-Null
@@ -111,6 +111,9 @@ function set-assoc
 	cmd /c assoc  .rtf=TextEditor.rtf | Out-Null
 	cmd /c assoc  .pptx=PresentationViewer.pptx | Out-Null
 	cmd /c assoc  .ppt=PresentationViewer.ppt | Out-Null
+    } catch {
+        throw ("$_.Exception.Message")
+    }
 	
 	WriteLog -LogString "ftype .xls .xlsx .csv"
 	cmd /c ftype `"SpreadsheetEditor.xls`"=`""$path_Spread`"" `""%1`"" | Out-Null

@@ -102,7 +102,7 @@ function set-assoc
 	
 	WriteLog -LogString "Start assoc"
     try {
-	cmds /c assoc .xls=SpreadsheetEditor.xls | Out-Null
+	cmd /c assoc .xls=SpreadsheetEditor.xls | Out-Null
 	cmd /c assoc .xlsx=SpreadsheetEditor.xlsx | Out-Null
 	cmd /c assoc  .xlsm=SpreadsheetEditor.xlsx | Out-Null
 	cmd /c assoc  .csv=SpreadsheetEditor.csv | Out-Null

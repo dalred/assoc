@@ -42,14 +42,13 @@ function set-userchoice {
     "PresentationViewer.pptx",
     "PresentationViewer.ppt")
 
-    foreach ($name in $type_list)
-    {
+    foreach ($name in $type_list) {
     $Ext=$name.Split(".")[1]
     $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
     $Progid=[Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice","Progid", $null)
     $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
         if ($Progid){
-            WriteLog -LogString "Progid=$Progid"
+            WriteLog -LogString "Old Progid=$Progid"
             $parent.DeleteSubKey('UserChoice', $true)
             $parent.CreateSubKey("UserChoice")|out-null
             $parent_user=$parent.OpenSubKey('UserChoice', $true)

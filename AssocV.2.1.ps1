@@ -46,17 +46,17 @@ function set-userchoice {
     {
     $Ext=$name.Split(".")[1]
     $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
+    $Progid=[Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice","Progid", $null)
     $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
-        foreach ($SubKey in $parent.GetSubKeyNames()){
-            if ($SubKey -eq 'UserChoice'){
-                WriteLog -LogString "DeleteSubKey UserChoice in $name"
-                $parent.DeleteSubKey('UserChoice', $true)
-                $parent.CreateSubKey("UserChoice")|out-null
-                $parent_user=$parent.OpenSubKey('UserChoice', $true)
-                WriteLog -LogString "SetValue UserChoice $name"
-                $parent_user.SetValue("Progid", $name, $RegistryValueKind)
-                $parent_user.Close()
-            }
+        if ($Progid){
+            WriteLog -LogString "Progid=$Progid"
+            $parent.DeleteSubKey('UserChoice', $true)
+            $parent.CreateSubKey("UserChoice")|out-null
+            $parent_user=$parent.OpenSubKey('UserChoice', $true)
+            WriteLog -LogString "SetValue UserChoice $name"
+            $parent_user.SetValue("Progid", $name, $RegistryValueKind)
+            $parent_user.Close()
+            $parent.Close()
         }
     }
 }

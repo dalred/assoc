@@ -20,7 +20,7 @@ function WriteLog
 	$LogMessage = "{0}: {1}" -f $Stamp, $LogString
 	Add-content $LogFile -value $LogMessage
 }
-#Работаем в HKEY_USERS, HKUpath
+#Работаем в HKEY_USERS, HKUpath, применяем команды ftype и assoc
 function main
 {
 	param ($program)
@@ -46,7 +46,7 @@ function main
                 WriteLog -LogString "assoc .$Ext=$ftype"
                 $cmdOutput=cmd /c assoc `".$Ext`"=`""$ftype`"" 2>&1
                 WriteLog -LogString "ftype $ftype=$path"
-                $cmdOutput=cmd /c ftype `"$ftype`"=`""$path`"" `""%1`"" 2>&1
+                $cmdOutput+=cmd /c ftype `"$ftype`"=`""$path`"" `""%1`"" 2>&1
                 if ($LASTEXITCODE -ne 0) {
                     throw ($cmdOutput)
                 }

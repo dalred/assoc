@@ -26,7 +26,7 @@ function main
 	param ($program)
 	$hash_object = @{
 		"МойОфис Текст"	      = @{path="$program\MyOffice\MyOffice Text.exe"; name=("TextEditor.docx", "TextEditor.doc", "TextEditor.rtf")};
-		"МойОфис Таблица"	  = @{path="$program\MyOffice\MyOffice Spreadsheet.exe"; name=("SpreadsheetEditor.xls", "SpreadsheetEditor.xlsx", "SpreadsheetEditor.csv")};
+		"МойОфис Таблица"	  = @{path="$program\MyOffice\MyOffice Spreadsheet.exe"; name=("SpreadsheetEditor.xls", "SpreadsheetEditor.xlsx", "SpreadsheetEditor.csv", "SpreadsheetEditor.xlsm")};
 		"МойОфис Презентация" = @{path="$program\MyOffice\MyOffice Presentation.exe"; name=("PresentationViewer.pptx", "PresentationViewer.ppt")};
 	}
 	$MyPSObject = New-Object -TypeName psobject -Property $hash_object

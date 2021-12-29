@@ -64,7 +64,6 @@ function main
 			    $Icon = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\DefaultIcon")
 			    If (-not $Icon)
 			    {
-				    $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
 				    WriteLog -LogString "CreateSubKey DefaultIcon"
 				    $parent.CreateSubKey("DefaultIcon") | out-null
 				    $parent_user = $parent.OpenSubKey('DefaultIcon', $true)
@@ -77,7 +76,6 @@ function main
 			    $parent.Close()
 			    $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
 			    $Progid = [Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice", "Progid", $null)
-			    $RegistryValueKind = [Microsoft.Win32.RegistryValueKind]::String
 			    if ($Progid)
 			    {
 				    WriteLog -LogString "Progid was $Progid"
@@ -108,42 +106,29 @@ if (-Not (Test-Path -Path HKU:\))
 }
 
 
-if ([IntPtr]::Size -eq 8)
+try
 {
-	try
-	{
-		main -program $env:ProgramFiles
-	}
-	catch
-	{
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-warning ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
-		WriteLog -LogString ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
-	}
-	finally
-	{
-		WriteLog -LogString "Finish work!"
-	}
-}
-else
-{
-	try
-	{
-		main -program ${env:ProgramFiles(x86)}
-	}
-	catch
-	{
-		$ErrorMessage = $_.Exception.Message
-		$FailedItem = $_.Exception.ItemName
-		Write-warning ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
-		WriteLog -LogString ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
-	}
-	finally
-	{
-		WriteLog -LogString "Finish work!"
-	}
-}
+    if ([IntPtr]::Size -eq 8)
+    {
+	    main -program $env:ProgramFiles
 
+    }
+    else
+    {
+		main -program ${env:ProgramFiles(x86)}
+	
+    }
+}
+catch
+	{
+		$ErrorMessage = $_.Exception.Message
+		$FailedItem = $_.Exception.ItemName
+		Write-warning ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
+		WriteLog -LogString ("Ошибка! {0} - {1}" -f $ErrorMessage, $FailedItem)
+	}
+finally
+{
+	WriteLog -LogString "Finish work!"
+}
 
 

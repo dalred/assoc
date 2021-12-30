@@ -1,4 +1,5 @@
-﻿<#Механизм работы такой, cmd /c assoc создает ассоциацию расширения файла к типу в root,
+﻿<# Скрипт написан для текущего пользователя,
+Механизм работы такой, cmd /c assoc создает ассоциацию расширения файла к типу в root,
 далее ftype связывает его с программой для выполнения, то есть по сути названия типов могут быть любимыми.
 Но есть случай в котором эти ассоциации не помогут, случай когда пользователь выбрал программу по умолчанию сам(открыть с помощью),
 в этом случае начинает действовать ветка Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts в Сurrent user,
@@ -43,7 +44,7 @@ function main
 				$ftype = $_
 				$Ext = $ftype.Split(".")[1]
 				WriteLog -LogString "assoc .$Ext=$ftype"
-				$cmdOutput = [string]::Join(" ", (cmd /c assoc `".$Ext`"=`""$ftype`"" 2>&1)+"`n")
+				$cmdOutput = [string]::Join(" ", (cmd /c assoc `".$Ext`"=`""$ftype`"" 2>&1) + "`n")
 				WriteLog -LogString "ftype $ftype=$path"
 				$cmdOutput += [string]::Join(" ", (cmd /c ftype `"$ftype`"=`""$path`"" `""%1`"" 2>&1) + "`n")
 				if ($LASTEXITCODE -ne 0)
@@ -51,6 +52,16 @@ function main
 					throw ($cmdOutput)
 				}
 				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
+				$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
+				$default = $parent_Ext.GetValue($null)
+				WriteLog -LogString "Old default=$default"
+				if (-not ($default) -or ($default -ne $ftype))
+				{
+					write-host $ftype
+					WriteLog -LogString "CreateSubKey default in $ftype"
+					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
+					$parent_Ext.Close()
+				}
 				$appKey = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\Application")
 				If (-not $appKey)
 				{

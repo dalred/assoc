@@ -6,9 +6,10 @@
 поэтому там тоже необходимо внести изменения, поскольку cmdlet не всегда хорошо отрабатывают в Powershell 2.0, когда работает с реестром, 
 мы воспользовались сборкой Microsoft.Win32.Registry, небольшие нарекания есть, но в целом отрабатывает хорошо.
 #>
-
-Add-Type -Assembly PresentationCore
 [System.Text.Encoding]::GetEncoding("cp866") | Out-Null
+Add-Type -Assembly PresentationCore
+
+
 $HKUpath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
 $Logfile = "$env:TEMP\assocscript_$env:computername.log"
 [System.Windows.Clipboard]::SetText($Logfile)
@@ -57,7 +58,6 @@ function main
 				WriteLog -LogString "Old default=$default"
 				if (-not ($default) -or ($default -ne $ftype))
 				{
-					write-host $ftype
 					WriteLog -LogString "CreateSubKey default in $ftype"
 					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
 					$parent_Ext.Close()
@@ -140,6 +140,6 @@ catch
 finally
 {
 	WriteLog -LogString "Finish work!"
+	
 }
-
 

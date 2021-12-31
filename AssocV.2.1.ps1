@@ -87,7 +87,7 @@ function main
 				$parent.Close()
 				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
 				$Progid = [Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice", "Progid", $null)
-				if ($Progid)
+				if (($Progid) -and ($Progid -ne $ftype))
 				{
 					WriteLog -LogString "Progid was $Progid"
 					WriteLog -LogString "DeleteSubKey UserChoice in $ftype type $Ext"

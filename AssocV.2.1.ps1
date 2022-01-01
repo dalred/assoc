@@ -105,18 +105,6 @@ function main
 	}
 	
 }
-
-if (-Not (Test-Path -Path HKCR:\))
-{
-	New-PSDrive -PSProvider registry -Root HKEY_CLASSES_ROOT -Name HKCR | Out-Null
-}
-
-if (-Not (Test-Path -Path HKU:\))
-{
-	New-PSDrive -PSProvider registry -Root HKEY_USERS -Name HKU | Out-Null
-}
-
-
 try
 {
 	if ([IntPtr]::Size -eq 8)

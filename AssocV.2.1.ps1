@@ -6,6 +6,8 @@
 поэтому там тоже необходимо внести изменения, поскольку cmdlet не всегда хорошо отрабатывают в Powershell 2.0, когда работает с реестром, 
 мы воспользовались сборкой Microsoft.Win32.Registry, небольшие нарекания есть, но в целом отрабатывает хорошо.
 #>
+
+
 [System.Text.Encoding]::GetEncoding("cp866") | Out-Null
 Add-Type -Assembly PresentationCore
 
@@ -13,6 +15,30 @@ Add-Type -Assembly PresentationCore
 $HKUpath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
 $Logfile = "$env:TEMP\assocscript_$env:computername.log"
 [System.Windows.Clipboard]::SetText($Logfile)
+
+
+function Update-RegistryChanges
+{
+	$code = @'
+    [System.Runtime.InteropServices.DllImport("Shell32.dll")] 
+    private static extern int SHChangeNotify(int eventId, int flags, IntPtr item1, IntPtr item2);
+    public static void Refresh() {
+        SHChangeNotify(0x8000000, 0, IntPtr.Zero, IntPtr.Zero);    
+    }
+'@
+	
+	try
+	{
+		Add-Type -MemberDefinition $code -Namespace SHChange -Name Notify
+	}
+	catch { }
+	
+	try
+	{
+		[SHChange.Notify]::Refresh()
+	}
+	catch { }
+}
 
 #Логирование по желанию.
 function WriteLog
@@ -85,19 +111,23 @@ function main
 					
 				}
 				$parent.Close()
-				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", $true)
-				$Progid = [Microsoft.Win32.Registry]::GetValue("HKEY_CURRENT_USER\$HKUpath\.$Ext\UserChoice", "Progid", $null)
-				if (($Progid) -and ($Progid -ne $ftype))
+				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
+				$userchoice = $parent.OpenSubKey("UserChoice")
+				If ($userchoice)
 				{
-					WriteLog -LogString "Progid was $Progid"
-					WriteLog -LogString "DeleteSubKey UserChoice in $ftype type $Ext"
-					$parent.DeleteSubKey('UserChoice', $true)
-					WriteLog -LogString "CreateSubKey UserChoice  in $ftype type $Ext"
-					$parent.CreateSubKey("UserChoice") | out-null
-					$parent_user = $parent.OpenSubKey('UserChoice', $true)
-					WriteLog -LogString "SetValue Progid $ftype type $Ext"
-					$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
-					$parent_user.Close()
+					$Progid = $userchoice.GetValue("Progid")
+					If ($Progid -ne $ftype)
+					{
+						WriteLog -LogString "Progid was $Progid"
+						WriteLog -LogString "DeleteSubKey UserChoice in $ftype type $Ext"
+						$parent.DeleteSubKey('UserChoice', $true)
+						WriteLog -LogString "CreateSubKey UserChoice  in $ftype type $Ext"
+						$parent.CreateSubKey("UserChoice") | out-null
+						$parent_user = $parent.OpenSubKey('UserChoice', $true)
+						WriteLog -LogString "SetValue Progid $ftype type $Ext"
+						$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
+						$parent_user.Close()
+					}
 				}
 				$parent.Close()
 			}
@@ -117,6 +147,7 @@ try
 		main -program ${env:ProgramFiles(x86)}
 		
 	}
+	Update-RegistryChanges
 }
 catch
 {
@@ -128,6 +159,5 @@ catch
 finally
 {
 	WriteLog -LogString "Finish work!"
-	
 }
 

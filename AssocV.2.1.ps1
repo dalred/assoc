@@ -47,13 +47,13 @@ function Get-UserExperience
 	$position1 = $dataString.IndexOf($userExperienceSearch)
 	$position2 = $dataString.IndexOf("}", $position1)
 	
-	Write-Output $dataString.Substring($position1, $position2 - $position1 + 1)
+	return $dataString.Substring($position1, $position2 - $position1 + 1)
 }
 
 function Get-UserSid
 {
 	$userSid = ((New-Object System.Security.Principal.NTAccount([Environment]::UserName)).Translate([System.Security.Principal.SecurityIdentifier]).value).ToLower()
-	Write-Output $userSid
+	return $userSid
 }
 
 function Get-HexDateTime
@@ -64,7 +64,7 @@ function Get-HexDateTime
 	$hi = bitshift -x $fileTime -Right 32
 	$low = ($fileTime -band 0xFFFFFFFFL)
 	$dateTimeHex = ($hi.ToString("X8") + $low.ToString("X8")).ToLower()
-	Write-Output $dateTimeHex
+	return $dateTimeHex
 }
 
 function Get-Hash
@@ -219,7 +219,7 @@ function Get-Hash
 		$base64Hash = [Convert]::ToBase64String($outHashBase)
 	}
 	
-	Write-Output $base64Hash
+	return $base64Hash
 }
 
 $HKUpath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
@@ -289,7 +289,7 @@ function main
 				}
 				<#$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
 				$OpenWith.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)
-				<#$OpenWith_class = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUclass\.$Ext\OpenWithProgids", $true)
+				$OpenWith_class = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUclass\.$Ext\OpenWithProgids", $true)
 				$OpenWith_class.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)#>
 				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
 				$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
@@ -326,8 +326,6 @@ function main
 				$parent.Close()
 				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
 				$userchoice = $parent.OpenSubKey("UserChoice")
-				
-				
 				If ($userchoice)
 				{
 					$Progid = $userchoice.GetValue("Progid")
@@ -339,23 +337,25 @@ function main
 						WriteLog -LogString "CreateSubKey UserChoice  in $ftype type $Ext"
 						$parent.CreateSubKey("UserChoice") | out-null
 						$parent_user = $parent.OpenSubKey('UserChoice', $true)
-						WriteLog -LogString "SetValue Progid $ftype type $Ext"
-						$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
 						WriteLog -LogString "Version is $Version"
 						if ($Version -ge 8)
 						{
+							$Extension = ".xls"
 							$userSid = Get-UserSid
 							$userExperience = Get-UserExperience
 							$userDateTime = Get-HexDateTime
-							$baseInfo = "$Extension$userSid$ProgId$userDateTime$userExperience".ToLower()
-							Write-Host $baseInfo
+							$baseInfo = ".$Ext$userSid$ftype$userDateTime$userExperience".ToLower()
 							$progHash = Get-Hash $baseInfo
-							Write-Host "$progHash in $ftype type $Ext"
 							WriteLog -LogString "SetValue Hash $progHash type $Ext"
-							$parent_user.SetValue("Hash", "$progHash", $RegistryValueKind)
+							$parent_user.SetValue("Hash", $progHash, $RegistryValueKind)
+							$parent.Close()
 						}
+						Write-Host "$progHash in $ftype type $Ext"
+						WriteLog -LogString "SetValue Progid $ftype type $Ext"
+						$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
 						$parent_user.Close()
 					}
+					$userchoice.Close()
 				}
 				$parent.Close()
 			}

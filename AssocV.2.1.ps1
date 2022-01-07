@@ -16,6 +16,7 @@ $Logfile = "$env:TEMP\assocscript_$env:computername.log"
 [System.Windows.Clipboard]::SetText($Logfile)
 $Version = ([environment]::OSVersion.Version).Major
 
+#region function for hash win10
 function bitshift
 {
 	param (
@@ -221,7 +222,7 @@ function Get-Hash
 	
 	return $base64Hash
 }
-
+#endregion
 $HKUpath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts"
 $HKUclass = "SOFTWARE\Classes"
 
@@ -279,38 +280,55 @@ function main
 			$_.name | ForEach-Object {
 				$ftype = $_
 				$Ext = $ftype.Split(".")[1]
-				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
-				if ($parent)
-				{
-					WriteLog -LogString "clear $ftype root"
-					Write-Host "clear $ftype root"
-					[Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', 0).DeleteSubKeyTree($ftype)
-				}
-				$parent.Close()
-				WriteLog -LogString "assoc .$Ext=$ftype"
-				$cmdOutput = [string]::Join(" ", (cmd /c assoc `".$Ext`"=`""$ftype`"" 2>&1) + "`n")
-				WriteLog -LogString "ftype $ftype=$path"
-				$cmdOutput += [string]::Join(" ", (cmd /c ftype `"$ftype`"=`""$path`"" `""%1`"" 2>&1) + "`n")
-				if ($LASTEXITCODE -ne 0)
-				{
-					throw ($cmdOutput)
-				}
+				#Clear root and hklm
+				
+				
 				<#$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
 				$OpenWith.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)
 				$OpenWith_class = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUclass\.$Ext\OpenWithProgids", $true)
 				$OpenWith_class.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)#>
-				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
+				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
+				#assoc *.extension
 				$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
 				$default = $parent_Ext.GetValue($null)
-				WriteLog -LogString "Old default=$default"
+				if ($default)
+				{
+					WriteLog -LogString "Old default=$default"
+				}
 				if (-not ($default) -or ($default -ne $ftype))
 				{
 					WriteLog -LogString "CreateSubKey default in $ftype"
 					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
 					$parent_Ext.Close()
 				}
-				$appKey = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\Application")
-				If (-not $appKey)
+				#assoc *.extension HKLM
+				$parent_Ext = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("SOFTWARE\Classes\.$Ext", $true)
+				$default = $parent_Ext.GetValue($null)
+				if ($default)
+				{
+					WriteLog -LogString "Old default LocalMachine=$default"
+				}
+				if (-not ($default) -or ($default -ne $ftype))
+				{
+					WriteLog -LogString "CreateSubKey LocalMachine default in $ftype"
+					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
+					$parent_Ext.Close()
+				}
+				
+				#ftype step ApplicationName
+				$appKey = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\Application", $true)
+				if ($appKey)
+				{
+					$ApplicationName = $appKey.GetValue('ApplicationName')
+					writeLog -LogString "Old appKey=$ApplicationName"
+					if ($ApplicationName -ne $name)
+					{
+						WriteLog -LogString "SetValue ApplicationName $name"
+						$appKey.SetValue("ApplicationName", $name, $RegistryValueKind)
+					}
+					
+				}
+				else
 				{
 					WriteLog -LogString "CreateSubKey Application"
 					$parent.CreateSubKey("Application") | out-null
@@ -319,8 +337,23 @@ function main
 					$parent_user.SetValue("ApplicationName", $name, $RegistryValueKind)
 					$parent_user.Close()
 				}
-				$Icon = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\DefaultIcon")
-				If (-not $Icon)
+				
+				#ftype step Icon
+				$Icon = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\DefaultIcon", $true)
+				if ($Icon)
+				{
+					$Icon_path = $Icon.GetValue($null)
+					writeLog -LogString "Old Icon_path=$Icon_path"
+					$ExtUP = $Ext.ToUpper()
+					if ($Icon_path -ne "$program\MyOffice\$ExtUP.ico")
+					{
+						WriteLog -LogString "SetValue Icon_path $program\MyOffice\$ExtUP.ico"
+						$Icon.SetValue($null, """$program\MyOffice\$ExtUP.ico""", $RegistryValueKind)
+						$Icon.Close()
+					}
+					
+				}
+				else
 				{
 					WriteLog -LogString "CreateSubKey DefaultIcon"
 					$parent.CreateSubKey("DefaultIcon") | out-null
@@ -329,9 +362,24 @@ function main
 					WriteLog -LogString "SetValue to DefaultIcon $program\MyOffice\$ExtUP.ico"
 					$parent_user.SetValue($null, """$program\MyOffice\$ExtUP.ico""", $RegistryValueKind)
 					$parent_user.Close()
-					
+					$parent.Close()
 				}
-				$parent.Close()
+				
+				#ftype step command
+				WriteLog -LogString "SetValue $path HKCRoot and HKLM"
+				$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell", $true)
+				if ($shell)
+				{
+					$shell.OpenSubKey("open\command", $true).SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
+				}
+				else
+				{
+					[Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', 0).CreateSubKey("$ftype\shell\open\command") | Out-Null
+					$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell\open\command", $true)
+					$shell.SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
+				}
+				
+				#Userchoice step
 				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
 				$userchoice = $parent.OpenSubKey("UserChoice")
 				If ($userchoice)
@@ -348,17 +396,17 @@ function main
 						WriteLog -LogString "Version is $Version"
 						if ($Version -ge 8)
 						{
-							$Extension = ".xls"
 							$userSid = Get-UserSid
 							$userExperience = Get-UserExperience
 							$userDateTime = Get-HexDateTime
 							$baseInfo = ".$Ext$userSid$ftype$userDateTime$userExperience".ToLower()
 							$progHash = Get-Hash $baseInfo
+							Write-Host "$progHash in $ftype type $Ext"
 							WriteLog -LogString "SetValue Hash $progHash type $Ext"
 							$parent_user.SetValue("Hash", $progHash, $RegistryValueKind)
 							$parent.Close()
 						}
-						Write-Host "$progHash in $ftype type $Ext"
+						
 						WriteLog -LogString "SetValue Progid $ftype type $Ext"
 						$parent_user.SetValue("Progid", $ftype, $RegistryValueKind)
 						$parent_user.Close()

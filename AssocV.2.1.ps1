@@ -7,7 +7,7 @@
 мы воспользовались сборкой Microsoft.Win32.Registry, небольшие нарекания есть, но в целом отрабатывает хорошо.
 #>
 
-
+#Добавить удаление старых веток ftype
 [System.Text.Encoding]::GetEncoding("cp866") | Out-Null
 Add-Type -Assembly PresentationCore
 
@@ -279,6 +279,14 @@ function main
 			$_.name | ForEach-Object {
 				$ftype = $_
 				$Ext = $ftype.Split(".")[1]
+				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true)
+				if ($parent)
+				{
+					WriteLog -LogString "clear $ftype root"
+					Write-Host "clear $ftype root"
+					[Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', 0).DeleteSubKeyTree($ftype)
+				}
+				$parent.Close()
 				WriteLog -LogString "assoc .$Ext=$ftype"
 				$cmdOutput = [string]::Join(" ", (cmd /c assoc `".$Ext`"=`""$ftype`"" 2>&1) + "`n")
 				WriteLog -LogString "ftype $ftype=$path"

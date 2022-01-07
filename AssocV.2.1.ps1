@@ -366,16 +366,18 @@ function main
 				}
 				
 				#ftype step command
-				WriteLog -LogString "SetValue $path HKCRoot and HKLM"
+				
 				$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell", $true)
 				if ($shell)
 				{
+					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
 					$shell.OpenSubKey("open\command", $true).SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
 				}
 				else
 				{
 					[Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', 0).CreateSubKey("$ftype\shell\open\command") | Out-Null
 					$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell\open\command", $true)
+					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
 					$shell.SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
 				}
 				
@@ -388,9 +390,9 @@ function main
 					If ($Progid -ne $ftype)
 					{
 						WriteLog -LogString "Progid was $Progid"
-						WriteLog -LogString "DeleteSubKey UserChoice in $ftype type $Ext"
+						WriteLog -LogString "DeleteSubKey UserChoice $Progid type $Ext"
 						$parent.DeleteSubKey('UserChoice', $true)
-						WriteLog -LogString "CreateSubKey UserChoice  in $ftype type $Ext"
+						WriteLog -LogString "CreateSubKey UserChoice $ftype type $Ext"
 						$parent.CreateSubKey("UserChoice") | out-null
 						$parent_user = $parent.OpenSubKey('UserChoice', $true)
 						WriteLog -LogString "Version is $Version"

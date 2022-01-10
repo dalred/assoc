@@ -281,13 +281,34 @@ function main
 				$ftype = $_
 				$Ext = $ftype.Split(".")[1]
 				#Clear root and hklm
-				
+				if ([Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true))
+				{
+					WriteLog -LogString "clear $ftype root"
+					Write-Host "clear $ftype root"
+					$parent_root = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
+					$parent_root.DeleteSubKeyTree($ftype)
+					$parent_root.Close()
+				}
+				#ftype step command
+				$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell", $true)
+				if ($shell)
+				{
+					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
+					$shell.OpenSubKey("open\command", $true).SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
+				}
+				else
+				{
+					[Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("", $true).CreateSubKey("$ftype\shell\open\command") | Out-Null
+					
+					$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell\open\command", $true)
+					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
+					$shell.SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
+				}
 				
 				<#$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
 				$OpenWith.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)
 				$OpenWith_class = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUclass\.$Ext\OpenWithProgids", $true)
 				$OpenWith_class.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)#>
-				$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
 				#assoc *.extension
 				$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
 				$default = $parent_Ext.GetValue($null)
@@ -316,6 +337,7 @@ function main
 				}
 				
 				#ftype step ApplicationName
+				
 				$appKey = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\Application", $true)
 				if ($appKey)
 				{
@@ -330,6 +352,7 @@ function main
 				}
 				else
 				{
+					$parent = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
 					WriteLog -LogString "CreateSubKey Application"
 					$parent.CreateSubKey("Application") | out-null
 					$parent_user = $parent.OpenSubKey('Application', $true)
@@ -365,21 +388,6 @@ function main
 					$parent.Close()
 				}
 				
-				#ftype step command
-				
-				$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell", $true)
-				if ($shell)
-				{
-					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
-					$shell.OpenSubKey("open\command", $true).SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
-				}
-				else
-				{
-					[Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', 0).CreateSubKey("$ftype\shell\open\command") | Out-Null
-					$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell\open\command", $true)
-					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
-					$shell.SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
-				}
 				
 				#Userchoice step
 				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)

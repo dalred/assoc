@@ -471,7 +471,7 @@ function main
 					$parent.DeleteSubKey('OpenWithProgids', $true)
 					writeLog -LogString "CreateSubKey OpenWith"
 					$parent.CreateSubKey('OpenWithProgids') | Out-Null
-					writeLog -LogString "CreateSubKey $ftype in OpenWithProgids type NONE"
+					writeLog -LogString "CreateSubKey .$Ext in OpenWithProgids type NONE"
 					[Advapi]::set_key("$HKUpath\.$Ext\OpenWithProgids", $ftype) | Out-Null
 					#$OpenWith.SetValue($ftype, [byte[]]@(), [Microsoft.Win32.RegistryValueKind]::None)
 				}

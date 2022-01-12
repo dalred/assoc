@@ -250,6 +250,61 @@ function Update-RegistryChanges
 	catch { }
 }
 
+Add-Type -TypeDefinition @"
+	using System;
+	using System.Diagnostics;
+	using System.Runtime.InteropServices;
+	using System.Security.Principal;
+    using Microsoft.Win32;
+    using Microsoft.Win32.SafeHandles;
+
+	public static class Advapi
+	{
+        private enum HKEY : uint
+	    {
+		    HKEY_CLASSES_ROOT = 0x80000000,
+		    HKEY_CURRENT_USER = 0x80000001,
+		    HKEY_LOCAL_MACHINE = 0x80000002,
+		    HKEY_USERS = 0x80000003,
+		    HKEY_PERFORMANCE_DATA = 0x80000004,
+		    HKEY_PERFORMANCE_TEXT = 0x80000050,
+		    HKEY_PERFORMANCE_NLSTEXT = 0x80000060,
+		    HKEY_CURRENT_CONFIG = 0x80000005
+	    }
+        
+        private enum VALUE_TYPE : uint
+        {
+            REG_NONE= 0,
+            REG_SZ = 1,
+            REG_EXPAND_SZ = 2,
+            REG_BINARY = 3,
+            REG_DWORD = 4,
+            REG_DWORD_LITTLE_ENDIAN = 4,
+            REG_DWORD_BIG_ENDIAN = 5,
+            REG_LINK = 6,
+            REG_MULTI_SZ = 7,
+            REG_RESOURCE_LIST = 8,
+            REG_FULL_RESOURCE_DESCRIPTOR = 9,
+            REG_RESOURCE_REQUIREMENTS_LIST = 10,
+            REG_QWORD_LITTLE_ENDIAN = 11
+        }
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto, BestFitMapping = false)]
+        private static extern int RegSetKeyValueW  (
+        HKEY hkey, 
+        string lpSubKey,
+        string lpValueName,
+        VALUE_TYPE type, 
+        byte[] data, 
+        uint dataLength);
+        public static int set_key(string subkey, string valuename){
+            return RegSetKeyValueW(HKEY.HKEY_CURRENT_USER, subkey, valuename, VALUE_TYPE.REG_NONE, null, 0);
+        }
+   }
+"@
+
+
+
 #Логирование по желанию.
 function WriteLog
 {
@@ -281,6 +336,7 @@ function main
 				$ftype = $_
 				$Ext = $ftype.Split(".")[1]
 				#Clear root and hklm
+				WriteLog -LogString "open ClassesRoot OpenSubKey $ftype  $true"
 				if ([Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($ftype, $true))
 				{
 					WriteLog -LogString "clear $ftype root"
@@ -299,7 +355,6 @@ function main
 				else
 				{
 					[Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("", $true).CreateSubKey("$ftype\shell\open\command") | Out-Null
-					
 					$shell = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("$ftype\shell\open\command", $true)
 					WriteLog -LogString "SetValue open\command $path HKCRoot and HKLM"
 					$shell.SetValue($null, "`"$path`" `"%1`"", $RegistryValueKind)
@@ -310,7 +365,18 @@ function main
 				$OpenWith_class = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUclass\.$Ext\OpenWithProgids", $true)
 				$OpenWith_class.SetValue($ftype, ([byte[]]@()), [Microsoft.Win32.RegistryValueKind]::None)#>
 				#assoc *.extension
+				
+				WriteLog -LogString ".OpenSubKey(.$Ext) in root"
 				$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
+				if (-not ($parent_Ext))
+				{
+					$parent_root = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey("", $true)
+					WriteLog -LogString "CreateSubKey(.$Ext) in root"
+					$parent_root.CreateSubKey("`.$Ext") | Out-Null
+					$parent_Ext = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey(".$Ext", $true)
+					$parent_Ext.SetValue("", $ftype, $RegistryValueKind)
+					
+				}
 				$default = $parent_Ext.GetValue($null)
 				if ($default)
 				{
@@ -322,8 +388,7 @@ function main
 					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
 					$parent_Ext.Close()
 				}
-				#assoc *.extension HKLM
-				$parent_Ext = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("SOFTWARE\Classes\.$Ext", $true)
+				<#assoc *.extension HKLM
 				$default = $parent_Ext.GetValue($null)
 				if ($default)
 				{
@@ -334,7 +399,7 @@ function main
 					WriteLog -LogString "CreateSubKey LocalMachine default in $ftype"
 					$parent_Ext.SetValue($null, $ftype, $RegistryValueKind)
 					$parent_Ext.Close()
-				}
+				}#>
 				
 				#ftype step ApplicationName
 				
@@ -387,10 +452,30 @@ function main
 					$parent_user.Close()
 					$parent.Close()
 				}
-				
-				
-				#Userchoice step
+				#Userchoice step Current User
 				$parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext", [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, [System.Security.AccessControl.RegistryRights]::ChangePermissions)
+				if ($parent)
+				{
+					$value = $parent.OpenSubKey("", $true).GetValue("")
+					if ($value -ne $ftype)
+					{
+						writeLog -LogString "SetValue $ftype in $HKUpath\.$Ext\ "
+						$parent.OpenSubKey("", $true).SetValue("", $ftype, $RegistryValueKind)
+					}
+				}
+				writeLog -LogString "CurrentUser.OpenSubKey OpenWith"
+				$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
+				if ($OpenWith)
+				{
+					writeLog -LogString "CurrentUser DeleteSubKey OpenWith"
+					$parent.DeleteSubKey('OpenWithProgids', $true)
+					writeLog -LogString "CreateSubKey OpenWith"
+					$parent.CreateSubKey('OpenWithProgids') | Out-Null
+					writeLog -LogString "CreateSubKey $ftype in OpenWithProgids type NONE"
+					[Advapi]::set_key("$HKUpath\.$Ext\OpenWithProgids", $ftype) | Out-Null
+					#$OpenWith.SetValue($ftype, [byte[]]@(), [Microsoft.Win32.RegistryValueKind]::None)
+				}
+				
 				$userchoice = $parent.OpenSubKey("UserChoice")
 				If ($userchoice)
 				{

@@ -251,8 +251,6 @@ function Update-RegistryChanges
 }
 
 Add-Type -TypeDefinition @"
-	using System;
-	using System.Diagnostics;
 	using System.Runtime.InteropServices;
 	using System.Security.Principal;
     using Microsoft.Win32;
@@ -260,7 +258,7 @@ Add-Type -TypeDefinition @"
 
 	public static class Advapi
 	{
-        private enum HKEY : uint
+        public enum HKEY : uint
 	    {
 		    HKEY_CLASSES_ROOT = 0x80000000,
 		    HKEY_CURRENT_USER = 0x80000001,
@@ -297,8 +295,8 @@ Add-Type -TypeDefinition @"
         VALUE_TYPE type, 
         byte[] data, 
         uint dataLength);
-        public static int set_key(string subkey, string valuename){
-            return RegSetKeyValueW(HKEY.HKEY_CURRENT_USER, subkey, valuename, VALUE_TYPE.REG_NONE, null, 0);
+        public static int set_key(HKEY hkey, string subkey, string valuename){
+            return RegSetKeyValueW(hkey, subkey, valuename, VALUE_TYPE.REG_NONE, null, 0);
         }
    }
 "@
@@ -463,22 +461,12 @@ function main
 						$parent.OpenSubKey("", $true).SetValue("", $ftype, $RegistryValueKind)
 					}
 				}
-				writeLog -LogString "CurrentUser.OpenSubKey OpenWith"
-				$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
-				if ($OpenWith)
-				{
-					writeLog -LogString "CurrentUser DeleteSubKey OpenWith"
-					$parent.DeleteSubKey('OpenWithProgids', $true)
-					writeLog -LogString "CreateSubKey OpenWith"
-					$parent.CreateSubKey('OpenWithProgids') | Out-Null
-					writeLog -LogString "CreateSubKey .$Ext in OpenWithProgids type NONE"
-					[Advapi]::set_key("$HKUpath\.$Ext\OpenWithProgids", $ftype) | Out-Null
-					#$OpenWith.SetValue($ftype, [byte[]]@(), [Microsoft.Win32.RegistryValueKind]::None)
-				}
+				
 				
 				$userchoice = $parent.OpenSubKey("UserChoice")
 				If ($userchoice)
 				{
+					
 					$Progid = $userchoice.GetValue("Progid")
 					If ($Progid -ne $ftype)
 					{
@@ -507,6 +495,21 @@ function main
 						$parent_user.Close()
 					}
 					$userchoice.Close()
+				}
+				else
+				{
+					writeLog -LogString "CurrentUser.OpenSubKey OpenWith"
+					$OpenWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$HKUpath\.$Ext\OpenWithProgids", $true)
+					if ($OpenWith)
+					{
+						writeLog -LogString "CurrentUser DeleteSubKey OpenWith"
+						$parent.DeleteSubKey('OpenWithProgids', $true)
+						writeLog -LogString "CreateSubKey OpenWith"
+						$parent.CreateSubKey('OpenWithProgids') | Out-Null
+						writeLog -LogString "CreateSubKey .$Ext in OpenWithProgids type NONE"
+						[Advapi]::set_key([Advapi+HKEY]::HKEY_CURRENT_USER, "$HKUpath\.$Ext\OpenWithProgids", $ftype) | Out-Null
+						#$OpenWith.SetValue($ftype, [byte[]]@(), [Microsoft.Win32.RegistryValueKind]::None)
+					}
 				}
 				$parent.Close()
 			}

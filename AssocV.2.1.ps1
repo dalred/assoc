@@ -255,51 +255,54 @@ Add-Type -TypeDefinition @"
 	using System.Security.Principal;
     using Microsoft.Win32;
     using Microsoft.Win32.SafeHandles;
+	namespace AdvapiSolution
+    {
+		public class Advapi
+		{
+	        public enum HKEY : uint
+		    {
+			    HKEY_CLASSES_ROOT = 0x80000000,
+			    HKEY_CURRENT_USER = 0x80000001,
+			    HKEY_LOCAL_MACHINE = 0x80000002,
+			    HKEY_USERS = 0x80000003,
+			    HKEY_PERFORMANCE_DATA = 0x80000004,
+			    HKEY_PERFORMANCE_TEXT = 0x80000050,
+			    HKEY_PERFORMANCE_NLSTEXT = 0x80000060,
+			    HKEY_CURRENT_CONFIG = 0x80000005
+		    }
+	        
+	        public enum VALUE_TYPE : uint
+	        {
+	            REG_NONE= 0,
+	            REG_SZ = 1,
+	            REG_EXPAND_SZ = 2,
+	            REG_BINARY = 3,
+	            REG_DWORD = 4,
+	            REG_DWORD_LITTLE_ENDIAN = 4,
+	            REG_DWORD_BIG_ENDIAN = 5,
+	            REG_LINK = 6,
+	            REG_MULTI_SZ = 7,
+	            REG_RESOURCE_LIST = 8,
+	            REG_FULL_RESOURCE_DESCRIPTOR = 9,
+	            REG_RESOURCE_REQUIREMENTS_LIST = 10,
+	            REG_QWORD_LITTLE_ENDIAN = 11
+	        }
 
-	public static class Advapi
-	{
-        public enum HKEY : uint
-	    {
-		    HKEY_CLASSES_ROOT = 0x80000000,
-		    HKEY_CURRENT_USER = 0x80000001,
-		    HKEY_LOCAL_MACHINE = 0x80000002,
-		    HKEY_USERS = 0x80000003,
-		    HKEY_PERFORMANCE_DATA = 0x80000004,
-		    HKEY_PERFORMANCE_TEXT = 0x80000050,
-		    HKEY_PERFORMANCE_NLSTEXT = 0x80000060,
-		    HKEY_CURRENT_CONFIG = 0x80000005
-	    }
-        
-        private enum VALUE_TYPE : uint
-        {
-            REG_NONE= 0,
-            REG_SZ = 1,
-            REG_EXPAND_SZ = 2,
-            REG_BINARY = 3,
-            REG_DWORD = 4,
-            REG_DWORD_LITTLE_ENDIAN = 4,
-            REG_DWORD_BIG_ENDIAN = 5,
-            REG_LINK = 6,
-            REG_MULTI_SZ = 7,
-            REG_RESOURCE_LIST = 8,
-            REG_FULL_RESOURCE_DESCRIPTOR = 9,
-            REG_RESOURCE_REQUIREMENTS_LIST = 10,
-            REG_QWORD_LITTLE_ENDIAN = 11
-        }
-
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto, BestFitMapping = false)]
-        private static extern int RegSetKeyValueW  (
-        HKEY hkey, 
-        string lpSubKey,
-        string lpValueName,
-        VALUE_TYPE type, 
-        byte[] data, 
-        uint dataLength);
-        public static int set_key(HKEY hkey, string subkey, string valuename){
-            return RegSetKeyValueW(hkey, subkey, valuename, VALUE_TYPE.REG_NONE, null, 0);
-        }
-   }
+	        [DllImport("advapi32.dll", CharSet = CharSet.Auto, BestFitMapping = false)]
+	        private static extern int RegSetKeyValueW  (
+	        HKEY hkey, 
+	        string lpSubKey,
+	        string lpValueName,
+	        VALUE_TYPE type, 
+	        byte[] data, 
+	        uint dataLength);
+	        public int set_key(HKEY hkey, string subkey, string valuename, VALUE_TYPE type){
+	            return RegSetKeyValueW(hkey, subkey, valuename, type, null, 0);
+	        }
+	   }
+}
 "@
+$Advapiobject = New-Object 'AdvapiSolution.Advapi'
 
 
 
@@ -507,7 +510,7 @@ function main
 						writeLog -LogString "CreateSubKey OpenWith"
 						$parent.CreateSubKey('OpenWithProgids') | Out-Null
 						writeLog -LogString "CreateSubKey .$Ext in OpenWithProgids type NONE"
-						[Advapi]::set_key([Advapi+HKEY]::HKEY_CURRENT_USER, "$HKUpath\.$Ext\OpenWithProgids", $ftype) | Out-Null
+						$Advapiobject.set_key('HKEY_CURRENT_USER', "$HKUpath\.$Ext\OpenWithProgids", $ftype, 'REG_NONE') | Out-Null
 						#$OpenWith.SetValue($ftype, [byte[]]@(), [Microsoft.Win32.RegistryValueKind]::None)
 					}
 				}

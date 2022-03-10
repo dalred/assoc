@@ -334,7 +334,7 @@ function main
 				throw ("Не существует пути: {0}" -f $path)
 			}
 			$_.name | ForEach-Object {
-				$ftype = $_
+				$ftype = $_+'.AD88350D9EDA'
 				$Ext = $ftype.Split(".")[1]
 				#Clear root and hklm
 				WriteLog -LogString "open ClassesRoot OpenSubKey $ftype  $true"
